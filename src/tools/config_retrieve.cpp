@@ -1,0 +1,66 @@
+#include <base/fs.h>
+#include <base/io.h>
+#include <base/log.h>
+#include <base/str.h>
+
+#include <engine/shared/datafile.h>
+#include <engine/storage.h>
+
+#include <game/mapitems.h>
+
+static constexpr const char *const TOOL_NAME = "config_retrieve";
+
+static void Process(IStorage *pStorage, const char *pMapName, const char *pConfigName)
+{
+	CDataFileReader Reader;
+	if(!Reader.Open(pStorage, pMapName, IStorage::TYPE_ABSOLUTE))
+	{
+		log_error(TOOL_NAME, "Failed to open map '%s' for reading", pMapName);
+		return;
+	}
+	bool ConfigFound = false;
+	int Start, Num;
+	Reader.GetType(MAPITEMTYPE_INFO, &Start, &Num);
+	for(int i = Start; i < Start + Num; i++)
+	{
+		int Id;
+		CMapItemInfoSettings *pItem = (CMapItemInfoSettings *)Reader.GetItem(i, nullptr, &Id);
+		int ItemSize = Reader.GetItemSize(i);
+		if(!pItem || Id != 0)
+			continue;
+
+		if(ItemSize < (int)sizeof(CMapItemInfoSettings))
+			break;
+		if(!(pItem->m_Settings > -1))
+			break;
+
+		ConfigFound = true;
+		IOHANDLE Config = pStorage->OpenFile(pConfigName, IOFLAG_WRITE, IStorage::TYPE_ABSOLUTE);
+		if(!Config)
+		{
+			log_error(TOOL_NAME, "Failed to open config '%s' for writing", pConfigName);
+			Reader.Close();
+			return;
+		}
+
+		int Size = Reader.GetDataSize(pItem->m_Settings);
+		char *pSettings = (char *)Reader.GetData(pItem->m_Settings);
+		char *pNext = pSettings;
+		while(pNext < pSettings + Size)
+		{
+			int StrSize = str_length(pNext) + 1;
+			io_write(Config, pNext, StrSize - 1);
+			io_write_newline(Config);
+			pNext += StrSize;
+		}
+		Reader.UnloadData(pItem->m_Settings);
+		io_close(Config);
+		break;
+	}
+	Reader.Close();
+	if(!ConfigFound)
+	{
+		(void)fs_remove(pConfigName);
+	}
+}
+#include "config_common.h"
