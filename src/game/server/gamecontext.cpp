@@ -1223,6 +1223,45 @@ void CGameContext::OnTick()
 	m_World.Tick();
 	m_PlayerMapping.Tick();
 
+	// MoonServer ping limiter: kick clients whose latency stays over the limit
+	if(g_Config.m_SvMaxPing > 0)
+	{
+		for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+		{
+			bool Known = false;
+			int Ping = 0;
+			if(m_apPlayers[ClientId])
+			{
+				IServer::CClientInfo Info;
+				if(Server()->GetClientInfo(ClientId, &Info))
+				{
+					Known = true;
+					Ping = Info.m_Latency;
+				}
+			}
+
+			if(Known && Ping > g_Config.m_SvMaxPing)
+			{
+				m_aPingOver[ClientId] += 1.0f / Server()->TickSpeed();
+				if(m_aPingOver[ClientId] >= (float)g_Config.m_SvMaxPingGrace)
+				{
+					char aBuf[256];
+					str_format(aBuf, sizeof(aBuf), "'%s' исключён: пинг %d выше лимита %d дольше %d сек", Server()->ClientName(ClientId), Ping, g_Config.m_SvMaxPing, g_Config.m_SvMaxPingGrace);
+					SendChatTarget(-1, aBuf);
+
+					char aReason[128];
+					str_format(aReason, sizeof(aReason), "Пинг слишком высокий (%d, лимит %d)", Ping, g_Config.m_SvMaxPing);
+					Server()->Kick(ClientId, aReason);
+					m_aPingOver[ClientId] = 0;
+				}
+			}
+			else
+			{
+				m_aPingOver[ClientId] = 0;
+			}
+		}
+	}
+
 	m_pController->Tick();
 
 	for(int i = 0; i < MAX_CLIENTS; i++)
@@ -1727,6 +1766,9 @@ void CGameContext::ProgressVoteOptions(int ClientId)
 
 void CGameContext::OnClientEnter(int ClientId)
 {
+	// MoonServer ping limiter: a fresh connection starts with a clean allowance
+	m_aPingOver[ClientId] = 0;
+
 	if(m_TeeHistorianActive)
 	{
 		m_TeeHistorian.RecordPlayerReady(ClientId);
@@ -3150,6 +3192,23 @@ void CGameContext::ConTunes(IConsole::IResult *pResult, void *pUserData)
 	}
 }
 
+// MoonServer: list current player pings (works with the sv_max_ping limiter)
+void CGameContext::ConPings(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+	{
+		IServer::CClientInfo Info;
+		if(pSelf->Server()->GetClientInfo(ClientId, &Info))
+		{
+			char aBuf[160];
+			str_format(aBuf, sizeof(aBuf), "#%02d %-20s %4d ms%s", ClientId, Info.m_pName, Info.m_Latency,
+				(g_Config.m_SvMaxPing > 0 && Info.m_Latency > g_Config.m_SvMaxPing) ? "  (выше лимита)" : "");
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "pings", aBuf);
+		}
+	}
+}
+
 void CGameContext::ConTuneZone(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
@@ -3873,6 +3932,7 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("toggle_tune", "s[tuning] f[value 1] f[value 2]", CFGFLAG_SERVER, ConToggleTuneParam, this, "Toggle tune variable");
 	Console()->Register("tune_reset", "?s[tuning]", CFGFLAG_SERVER, ConTuneReset, this, "Reset all or one tuning variable to default");
 	Console()->Register("tunes", "", CFGFLAG_SERVER, ConTunes, this, "List all tuning variables and their values");
+	Console()->Register("pings", "", CFGFLAG_SERVER, ConPings, this, "MoonServer: list current pings of all players");
 	Console()->Register("tune_zone", "i[zone] s[tuning] f[value]", CFGFLAG_SERVER | CFGFLAG_GAME, ConTuneZone, this, "Tune in zone a variable to value");
 	Console()->Register("tune_zone_dump", "i[zone]", CFGFLAG_SERVER, ConTuneDumpZone, this, "Dump zone tuning in zone x");
 	Console()->Register("tune_zone_reset", "?i[zone]", CFGFLAG_SERVER, ConTuneResetZone, this, "Reset zone tuning in zone x or in all zones");

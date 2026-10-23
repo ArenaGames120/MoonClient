@@ -169,6 +169,8 @@ MACRO_CONFIG_INT(McVoiceAsst, mc_voice_asst, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_S
 MACRO_CONFIG_INT(McVoiceVolume, mc_voice_volume, 80, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MoonClient: AI assistant reply voice volume in percent")
 MACRO_CONFIG_STR(McVoiceLang, mc_voice_lang, 8, "ru", CFGFLAG_CLIENT | CFGFLAG_SAVE, "MoonClient: language of the voice assistant speech recognition and tts (ru, en, ...)")
 MACRO_CONFIG_INT(McVoiceDebug, mc_voice_debug, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MoonClient: log voice assistant errors to the console")
+MACRO_CONFIG_INT(SvMaxPing, sv_max_ping, 0, 0, 1000, CFGFLAG_SERVER | CFGFLAG_SAVE, "MoonServer: kick players whose ping stays above this value (0 = off)")
+MACRO_CONFIG_INT(SvMaxPingGrace, sv_max_ping_grace, 8, 0, 300, CFGFLAG_SERVER | CFGFLAG_SAVE, "MoonServer: seconds of continuously high ping allowed before the kick")
 MACRO_CONFIG_INT(McMenuTheme, mc_menu_theme, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MoonClient: custom night sky menu theme with the moon and drifting clouds")
 MACRO_CONFIG_INT(McStartClock, mc_start_clock, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MoonClient: show a clock and the date on the start menu")
 MACRO_CONFIG_INT(ClLocalServerPublic, cl_local_server_public, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "MoonClient: make the local server public - register it with the master server so anyone can find it in the server browser")
